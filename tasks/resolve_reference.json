@@ -1,0 +1,23 @@
+{
+  "description": "Generate targets from Active Directory",
+  "files": ["ruby_task_helper/files/task_helper.rb"],
+  "input_method": "stdin",
+  "parameters": {
+    "ad_domain": {
+      "type": "String[1]"
+    },
+    "domain_controller": {
+      "type": "Optional[String[1]]"
+    },
+    "username": {
+      "type": "Optional[String[1]]"
+    },
+    "password": {
+      "type": "Optional[String[1]]",
+      "sensitive": true
+    },
+    "group": {
+      "type": "Optional[String[1]]"
+    }
+  }
+}

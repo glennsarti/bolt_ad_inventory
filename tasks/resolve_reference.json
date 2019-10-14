@@ -4,20 +4,29 @@
   "input_method": "stdin",
   "parameters": {
     "ad_domain": {
+      "description" : "REQUIRED",
       "type": "String[1]"
     },
     "domain_controller": {
+      "description" : "TODO",
       "type": "Optional[String[1]]"
     },
-    "username": {
+    "user": {
+      "description" : "TODO",
       "type": "Optional[String[1]]"
     },
     "password": {
+      "description" : "TODO",
       "type": "Optional[String[1]]",
       "sensitive": true
     },
     "group": {
+      "description" : "TODO",
       "type": "Optional[String[1]]"
+    },
+    "calculate_transport": {
+      "description" : "TODO Defaults to true",
+      "type": "Optional[Boolean]"
     }
   }
 }

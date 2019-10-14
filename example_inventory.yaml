@@ -1,0 +1,33 @@
+version: 2
+groups:
+  - name: all_bolt_domain
+    config:
+      winrm:
+        ssl: false
+        user: "BOLT\\Administrator"
+        password: "Password1"
+    targets:
+      - _plugin: ad_inventory
+        ad_domain: "bolt.local"
+        domain_controller: "192.168.200.200"
+        user: "BOLT\\Administrator"
+        password: "Password1"
+        calculate_transport: false
+# config:
+#   winrm:
+#     username: "BOLT\\Administrator"
+#     password: Password1
+#     ssl: false
+
+        # tenant_id: xxxx-xxx-xxxx
+        # client_id: xxxx-xxx-xxxx
+        # client_secret: xxxx-xxx-xxxx
+        # subscription_id: xxxx-xxx-xxxx
+        # location: eastus
+        # resource_group: bolt
+        # tags:
+        #   foo: bar
+        #   baz: bak
+
+# be bolt command run "Write-host 'Hello'" --debug --targets all_bolt_domain --inventoryfile .\example_inventory.yaml --modulepath .\spec\fixtures\modules\
+# be bolt command run "Write-host 'Hello'" --target 192.168.200.200 --transport=winrm --no-ssl --user Bolt\Administrator --password Password1

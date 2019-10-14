@@ -4,9 +4,12 @@
   "author": "glennsarti",
   "summary": "Bolt Inventory Plugin for Active Directory",
   "license": "Apache-2.0",
-  "source": "",
+  "source": "https://github.com/glennsarti/bolt_ad_inventory",
   "dependencies": [
-
+    {
+      "name": "puppetlabs/ruby_task_helper",
+      "version_requirement": ">= 0.0.0"
+    }
   ],
   "operatingsystem_support": [
     {

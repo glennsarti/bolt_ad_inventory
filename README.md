@@ -23,6 +23,47 @@ This should be a fairly short description helps the user decide if your module i
 
 ## Setup
 
+Install net-ldap gem into Bolt
+
+``` text
+> "C:/Program Files/Puppet Labs/Bolt/bin/gem.bat" install --user-install net-ldap
+```
+
+### Development
+
+``` text
+> bundle exec rake spec_prep
+
+...
+
+> bundle exec bolt command run "Write-host 'Hello'" --modulepath spec/fixtures/modules  --inventoryfile example_inventory.yaml
+```
+
+Example Inventory
+``` yaml
+# inventory.yaml
+version: 2
+groups:
+  - name: all_bolt_domain
+    targets:
+      - _plugin: ad_inventory
+        ad_domain: 'bolt.local'
+        domain_controller: '192.168.200.200'
+        username: 'BOLT\\Administrator'
+        password: 'Password1'
+
+        # tenant_id: xxxx-xxx-xxxx
+        # client_id: xxxx-xxx-xxxx
+        # client_secret: xxxx-xxx-xxxx
+        # subscription_id: xxxx-xxx-xxxx
+        # location: eastus
+        # resource_group: bolt
+        # tags:
+        #   foo: bar
+        #   baz: bak
+```
+
+
 ### What ad_inventory affects **OPTIONAL**
 
 If it's obvious what your module touches, you can skip this section. For example, folks can probably figure out that your mysql_instance module affects their MySQL instances.

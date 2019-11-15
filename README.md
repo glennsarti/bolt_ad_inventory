@@ -49,20 +49,56 @@ groups:
       - _plugin: ad_inventory
         ad_domain: 'bolt.local'
         domain_controller: '192.168.200.200'
-        username: 'BOLT\\Administrator'
+        user: 'BOLT\\Administrator'
         password: 'Password1'
-
-        # tenant_id: xxxx-xxx-xxxx
-        # client_id: xxxx-xxx-xxxx
-        # client_secret: xxxx-xxx-xxxx
-        # subscription_id: xxxx-xxx-xxxx
-        # location: eastus
-        # resource_group: bolt
-        # tags:
-        #   foo: bar
-        #   baz: bak
 ```
 
+### Example: Filter out computers older than given number of days
+
+Sometimes in Active Directory land, computer objects are not removed. This plugin
+allows you to filter out objects older than a given number of days. 
+To do this there are two options available on the plugin:
+  * `filter_older_attribute` : This is the name of the LDAP attribute that contains a LDAP timestamp value that we'll use for filtering. Some good options here are `'pwdLastSet'` and `'lastLogonTimestamp'`.
+  * `filter_older_than_days` : Number of days (integer) that will be used as the cut-off point. If an object is older than this many days it will be filtered out of the results.
+
+``` yaml
+# inventory.yaml
+version: 2
+groups:
+  - name: all_bolt_domain
+    targets:
+      - _plugin: ad_inventory
+        ad_domain: 'bolt.local'
+        domain_controller: '192.168.200.200'
+        user: 'BOLT\\Administrator'
+        password: 'Password1'
+        filter_older_attribute: 'pwdLastSet'
+        filter_older_than_days: 30
+```
+
+### Example: Filter out computers by name
+
+It's common that a computer may be returned from AD, but you have problems connecting to it.
+We provide the ability to filter out hosts, by name, coming form this plugin so you can get your work done.
+To accomplish this, we've provided the option `filter_dns_hostnames`. Simply pass in an array 
+of hostnames into this option, and any host matching that name will be excluded.
+
+``` yaml
+# inventory.yaml
+version: 2
+groups:
+  - name: all_bolt_domain
+    targets:
+      - _plugin: ad_inventory
+        ad_domain: 'bolt.local'
+        domain_controller: '192.168.200.200'
+        user: 'BOLT\\Administrator'
+        password: 'Password1'
+        filter_dns_hostnames:
+          - mybadwinrm.bolt.local
+          - mybaddc01.bolt.local
+          - sccm03.bolt.local
+```
 
 ### What ad_inventory affects **OPTIONAL**
 

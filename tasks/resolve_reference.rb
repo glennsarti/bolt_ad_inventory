@@ -10,6 +10,7 @@ task_helper = [
 raise "Could not find the Bolt ruby_task_helper" if task_helper.nil?
 require_relative task_helper
 
+require 'date'
 require 'net-ldap'
 
 class ActiveDirectoryInventory < TaskHelper
@@ -40,14 +41,29 @@ class ActiveDirectoryInventory < TaskHelper
     raise "Error occured binding to the domain controller #{ldap_properties[:host]}: #{ldap.get_operation_result.message} #{ldap.get_operation_result.error_message}" unless ldap.get_operation_result.code.zero?
 
     # Execute the search
+    filter_dns_hostnames = opts[:filter_dns_hostnames]
+    filter_older_attribute = opts[:filter_older_attribute]
+    filter_older_than_days = opts[:filter_older_than_days]
+    ad_attributes = DEFAULT_AD_ATTRIBUTES.dup
+    if filter_older_attribute && filter_older_than_days
+      filter_older = true
+      filter_older_attribute_s = filter_older_attribute.downcase.to_s
+      ad_attributes << filter_older_attribute
+    end
     calc_transport = opts[:calculate_transport] || true
     result = []
     ldap.search(
       base:         x500_domain,
       filter:       Net::LDAP::Filter.eq( 'objectCategory', 'computer' ),
-      attributes:   DEFAULT_AD_ATTRIBUTES,
+      attributes:   ad_attributes,
       return_result: false
     ) do |entry|
+      if filter_dns_hostnames
+        next if ad_entry_filter_dns_hostnames(entry, filter_dns_hostnames)
+      end
+      if filter_older
+        next if ad_entry_filter_older(entry, filter_older_attribute, filter_older_than_days)
+      end
       obj = ad_entry_to_target_hash(entry, calc_transport)
       result << obj unless obj.nil?
     end
@@ -56,6 +72,31 @@ class ActiveDirectoryInventory < TaskHelper
   end
 
   # private
+  def ad_entry_filter_dns_hostnames(entry, filter_dns_hostnames)
+    return false unless entry.attribute_names.include?(:dnshostname)
+    return false if entry.dnshostname.nil? || entry.dnshostname.empty?
+    entry_dns_hostname = entry.dnshostname[0]
+    filter_dns_hostnames.include?(entry_dns_hostname)
+  end
+
+  def ldap_to_unix_time(ldap_time_s)
+    # https://stackoverflow.com/questions/4647169/how-to-convert-ldap-timestamp-to-unix-timestamp
+    seconds_since_epoch = ldap_time_s.to_f / 10**7
+    ldap_datetime = Time.at(seconds_since_epoch.to_i).to_datetime
+    unix_datetime = (ldap_datetime - ((1970 - 1601) * 365 + 89))
+    unix_datetime
+  end
+
+  def ad_entry_filter_older(entry, filter_older_attribute, filter_older_than_days)
+    return false if entry[filter_older_attribute].nil? || entry[filter_older_attribute].empty?
+
+    unix_time = ldap_to_unix_time(entry[filter_older_attribute][0])
+    if (DateTime.now - unix_time).to_i > filter_older_than_days.to_i
+      return true
+    end
+    return false
+  end
+
   def ad_entry_to_target_hash(entry, calculate_transport)
     return unless entry.attribute_names.include?(:dnshostname)
     return if entry.dnshostname.nil? || entry.dnshostname.empty?
@@ -73,7 +114,6 @@ class ActiveDirectoryInventory < TaskHelper
     end
 
     {
-      'name' => entry.dn,
       'uri' => entry.dnshostname[0],
     }.tap { |i| i['config'] = { 'transport' => transport} unless transport.nil? }
   end

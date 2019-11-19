@@ -41,32 +41,41 @@ class ActiveDirectoryInventory < TaskHelper
     raise "Error occured binding to the domain controller #{ldap_properties[:host]}: #{ldap.get_operation_result.message} #{ldap.get_operation_result.error_message}" unless ldap.get_operation_result.code.zero?
 
     # Execute the search
-    filter_dns_hostnames = opts[:filter_dns_hostnames]
     filter_older_attribute = opts[:filter_older_attribute]
     filter_older_than_days = opts[:filter_older_than_days]
+    ignore_dns_hostnames = opts[:ignore_dns_hostnames]
+    member_of_group_dn = opts[:member_of_group_dn]
     
-    ad_attributes = DEFAULT_AD_ATTRIBUTES.dup
     ldap_filter = Net::LDAP::Filter.eq('objectCategory', 'computer')
 
+    # filter out hosts that have a time property older than X days
     if filter_older_attribute && filter_older_than_days
       filter_older_attribute_s = filter_older_attribute.downcase.to_s
+      # compute the time (from now) older than X days
+      # this will be our "reference" time, anything older than this time is too old
+      # anything newer (greater) than this time we want to return
       filter_older_than_unix = (DateTime.now - filter_older_than_days.to_i).to_time.to_i
+      # convert the Unix timestamp to an LDAP timestamp
       filter_older_than_ldap = unix_to_ldap_time(filter_older_than_unix)
     
-      ad_attributes << filter_older_attribute
-      ldap_filter = (ldap_filter &  Net::LDAP::Filter.ge(filter_older_attribute, filter_older_than_ldap))
+      ldap_filter = (ldap_filter & Net::LDAP::Filter.ge(filter_older_attribute, filter_older_than_ldap))
+    end
+
+    # only return members of this group
+    if member_of_group_dn
+      ldap_filter = (ldap_filter & Net::LDAP::Filter.eq('memberOf', member_of_group_dn))
     end
 
     calc_transport = opts[:calculate_transport] || true
     result = []
     ldap.search(
-      base:         x500_domain,
-      filter:       ldap_filter,
-      attributes:   ad_attributes,
+      base:          x500_domain,
+      filter:        ldap_filter,
+      attributes:    DEFAULT_AD_ATTRIBUTES.dup,
       return_result: false
     ) do |entry|
-      if filter_dns_hostnames
-        next if ad_entry_filter_dns_hostnames(entry, filter_dns_hostnames)
+      if ignore_dns_hostnames
+        next if ad_entry_ignore_dns_hostnames(entry, ignore_dns_hostnames)
       end
       obj = ad_entry_to_target_hash(entry, calc_transport)
       result << obj unless obj.nil?
@@ -76,11 +85,11 @@ class ActiveDirectoryInventory < TaskHelper
   end
 
   # private
-  def ad_entry_filter_dns_hostnames(entry, filter_dns_hostnames)
+  def ad_entry_ignore_dns_hostnames(entry, ignore_dns_hostnames)
     return false unless entry.attribute_names.include?(:dnshostname)
     return false if entry.dnshostname.nil? || entry.dnshostname.empty?
     entry_dns_hostname = entry.dnshostname[0]
-    filter_dns_hostnames.include?(entry_dns_hostname)
+    ignore_dns_hostnames.include?(entry_dns_hostname)
   end
 
   def ldap_to_unix_time(ldap_time_s)

@@ -36,9 +36,13 @@
       "description" : "LDAP attribute to use for filtering out old computers. Some good choices are pwdLastSet, lastLogonTimestamp",
       "type": "Optional[String]"
     },
-    "filter_dns_hostnames": {
-      "description" : "Array of computer DNS Hostnames to filter out.",
+    "ignore_dns_hostnames": {
+      "description" : "Array of computer DNS Hostnames to ignore. These hosts will be excluded from the results",
       "type": "Optional[Array[String]]"
+    },
+    "member_of_group_dn": {
+      "description" : "Only return computers that are members of this group. Please specify the grou by it's full Distinguished Name (DN)",
+      "type": "Optional[String]"
     }
   }
 }

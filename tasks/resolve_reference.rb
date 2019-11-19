@@ -44,25 +44,29 @@ class ActiveDirectoryInventory < TaskHelper
     filter_dns_hostnames = opts[:filter_dns_hostnames]
     filter_older_attribute = opts[:filter_older_attribute]
     filter_older_than_days = opts[:filter_older_than_days]
+    
     ad_attributes = DEFAULT_AD_ATTRIBUTES.dup
+    ldap_filter = Net::LDAP::Filter.eq('objectCategory', 'computer')
+
     if filter_older_attribute && filter_older_than_days
-      filter_older = true
       filter_older_attribute_s = filter_older_attribute.downcase.to_s
+      filter_older_than_unix = (DateTime.now - filter_older_than_days.to_i).to_time.to_i
+      filter_older_than_ldap = unix_to_ldap_time(filter_older_than_unix)
+    
       ad_attributes << filter_older_attribute
+      ldap_filter = (ldap_filter &  Net::LDAP::Filter.ge(filter_older_attribute, filter_older_than_ldap))
     end
+
     calc_transport = opts[:calculate_transport] || true
     result = []
     ldap.search(
       base:         x500_domain,
-      filter:       Net::LDAP::Filter.eq( 'objectCategory', 'computer' ),
+      filter:       ldap_filter,
       attributes:   ad_attributes,
       return_result: false
     ) do |entry|
       if filter_dns_hostnames
         next if ad_entry_filter_dns_hostnames(entry, filter_dns_hostnames)
-      end
-      if filter_older
-        next if ad_entry_filter_older(entry, filter_older_attribute, filter_older_than_days)
       end
       obj = ad_entry_to_target_hash(entry, calc_transport)
       result << obj unless obj.nil?
@@ -87,14 +91,11 @@ class ActiveDirectoryInventory < TaskHelper
     unix_datetime
   end
 
-  def ad_entry_filter_older(entry, filter_older_attribute, filter_older_than_days)
-    return false if entry[filter_older_attribute].nil? || entry[filter_older_attribute].empty?
-
-    unix_time = ldap_to_unix_time(entry[filter_older_attribute][0])
-    if (DateTime.now - unix_time).to_i > filter_older_than_days.to_i
-      return true
-    end
-    return false
+  def unix_to_ldap_time(unix_secs)
+    unix_datetime = Time.at(unix_secs).to_datetime
+    ldap_datetime = unix_datetime + ((1970 - 1601) * 365 + 89)
+    ldap_secs = ldap_datetime.to_time.to_i * 10**7
+    ldap_secs
   end
 
   def ad_entry_to_target_hash(entry, calculate_transport)
@@ -114,6 +115,7 @@ class ActiveDirectoryInventory < TaskHelper
     end
 
     {
+      'name' => entry.dn,
       'uri' => entry.dnshostname[0],
     }.tap { |i| i['config'] = { 'transport' => transport} unless transport.nil? }
   end

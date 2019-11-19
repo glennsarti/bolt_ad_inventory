@@ -76,11 +76,11 @@ groups:
         filter_older_than_days: 30
 ```
 
-### Example: Filter out computers by name
+### Example: Ignore computers by DNS hostname
 
 It's common that a computer may be returned from AD, but you have problems connecting to it.
 We provide the ability to filter out hosts, by name, coming form this plugin so you can get your work done.
-To accomplish this, we've provided the option `filter_dns_hostnames`. Simply pass in an array 
+To accomplish this, we've provided the option `ignore_dns_hostnames`. Simply pass in an array 
 of hostnames into this option, and any host matching that name will be excluded.
 
 ``` yaml
@@ -94,10 +94,31 @@ groups:
         domain_controller: '192.168.200.200'
         user: 'BOLT\\Administrator'
         password: 'Password1'
-        filter_dns_hostnames:
+        ignore_dns_hostnames:
           - mybadwinrm.bolt.local
           - mybaddc01.bolt.local
           - sccm03.bolt.local
+```
+
+### Example: Only return members of a given group
+
+It's common for AD admins to use groups for targetting. We provide the ability to 
+only return computers/hosts that are members of a specified group using the
+`member_of_group_dn` parameter. When passing a group to this parameter, you'll need to
+pass the full Distinguished Named (`dn`) of the group (example: `CN=Patching Group,OU=GPO Groups,OU=Groups,DC=domain,DC=tld,DC=tech`).
+
+``` yaml
+# inventory.yaml
+version: 2
+groups:
+  - name: patching_group_bolt_domain
+    targets:
+      - _plugin: ad_inventory
+        ad_domain: 'bolt.local'
+        domain_controller: '192.168.200.200'
+        user: 'BOLT\\Administrator'
+        password: 'Password1'
+        member_of_group_dn: 'CN=Patching Group,OU=GPO Groups,OU=Groups,DC=domain,DC=tld,DC=tech'
 ```
 
 ### What ad_inventory affects **OPTIONAL**

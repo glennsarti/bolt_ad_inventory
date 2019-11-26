@@ -53,13 +53,17 @@ groups:
         password: 'Password1'
 ```
 
-### Example: Filter out computers older than given number of days
+### Example: Ignore computers older than given number of days
 
-Sometimes in Active Directory land, computer objects are not removed. This plugin
-allows you to filter out objects older than a given number of days. 
+Sometimes computers are rebuilt, but not deleted from Active Directory.
+This can cause stale objects within AD.
+This bolt plugin can ignore objects older than a given number of days.
+
 To do this there are two options available on the plugin:
-  * `filter_older_attribute` : This is the name of the LDAP attribute that contains a LDAP timestamp value that we'll use for filtering. Some good options here are `'pwdLastSet'` and `'lastLogonTimestamp'`.
-  * `filter_older_than_days` : Number of days (integer) that will be used as the cut-off point. If an object is older than this many days it will be filtered out of the results.
+
+* `ignore_older_than_attribute` : This is the name of the LDAP attribute that contains a LDAP timestamp value that we'll use for ignoring. Common attributes used are `pwdLastSet` or `lastLogonTimestamp`.
+
+* `ignore_older_than_days` : Number of days (integer) that will be used as the cut-off point. If an object is older than this many days it will not be part of the inventory.
 
 ``` yaml
 # inventory.yaml
@@ -72,16 +76,16 @@ groups:
         domain_controller: '192.168.200.200'
         user: 'BOLT\\Administrator'
         password: 'Password1'
-        filter_older_attribute: 'pwdLastSet'
-        filter_older_than_days: 30
+        ignore_older_than_attribute: 'pwdLastSet'
+        ignore_older_than_days: 30
 ```
 
 ### Example: Ignore computers by DNS hostname
 
-It's common that a computer may be returned from AD, but you have problems connecting to it.
-We provide the ability to filter out hosts, by name, coming form this plugin so you can get your work done.
-To accomplish this, we've provided the option `ignore_dns_hostnames`. Simply pass in an array 
-of hostnames into this option, and any host matching that name will be excluded.
+It's common that a computer may be returned from AD, but you have may not be able to connect to it: For example, it's behind a firewall or requires a bastion host.
+The `ignore_dns_hostnames` attribute is used to ignore specific computers which match their DNS hostname in AD. Pass in an array of hostnames into this option, and any host matching that name will be excluded.
+
+Note that this must be an exact name match and is case-sensitive
 
 ``` yaml
 # inventory.yaml
@@ -102,10 +106,28 @@ groups:
 
 ### Example: Only return members of a given group
 
-It's common for AD admins to use groups for targetting. We provide the ability to 
-only return computers/hosts that are members of a specified group using the
-`member_of_group_dn` parameter. When passing a group to this parameter, you'll need to
-pass the full Distinguished Named (`dn`) of the group (example: `CN=Patching Group,OU=GPO Groups,OU=Groups,DC=domain,DC=tld,DC=tech`).
+It is common for AD administrators to use groups to categorize Computers to ease administrative burden.
+For example, applying Group Policies or restricting authentication.
+You can use the `member_of_group_dn` attribute to return the Computer objects for a particular group.
+This enables you to use your existing administrative groups with Bolt.
+
+Note - The `member_of_group_dn` is the full Distinguished Name (`dn`) of the group.
+For example: `CN=WSUS Servers,OU=GPO Groups,OU=Groups,DC=domain,DC=tld,DC=tech`.
+
+Note - This does not match nested groups; only immediate group membership.
+For example, if `Computer1` is a member of `WSUS Servers`, and `WSUS Servers` is a member of `All Servers`
+
+``` text
+  Computer Object: Computer1`
+    |
+    +---- Member of Group: WSUS Servers
+            |
+            +---- Member of Group: All Servers
+```
+
+The plugin will find `Computer1` if the `member_of_group_dn` is set to WSUS Servers, but not All Servers.
+
+Note - The plugin binds using `ldap://`, not via [Global Catalog](https://docs.microsoft.com/en-us/windows/win32/ad/global-catalog) (`gc://`) therefore [Universal Groups](https://docs.microsoft.com/en-us/windows/security/identity-protection/access-control/active-directory-security-groups) may not be available (The Domain Controller must also host a Global Catalog). Domain Local and Global Groups can be used.
 
 ``` yaml
 # inventory.yaml
@@ -118,7 +140,7 @@ groups:
         domain_controller: '192.168.200.200'
         user: 'BOLT\\Administrator'
         password: 'Password1'
-        member_of_group_dn: 'CN=Patching Group,OU=GPO Groups,OU=Groups,DC=domain,DC=tld,DC=tech'
+        member_of_group_dn: 'CN=Patching Group 1,OU=GPO Groups,OU=Groups,DC=bolt,DC=local'
 ```
 
 ### What ad_inventory affects **OPTIONAL**

@@ -24,6 +24,15 @@ class ActiveDirectoryInventory < TaskHelper
     raise TaskHelper::Error.new('The Active Directory Inventory Plugin requires the ad_domain', 'bolt.plugin/validation-error') if ad_domain.nil? || ad_domain.empty?
     domain_controller = opts[:domain_controller] || opts[:ad_domain]
 
+    # Get user settings
+    ignore_older_than_attribute = opts[:ignore_older_than_attribute]
+    ignore_older_than_days = opts[:ignore_older_than_days]
+    ignore_dns_hostnames = opts[:ignore_dns_hostnames]
+    member_of_group_dn = opts[:member_of_group_dn]
+
+    raise 'ignore_older_than_days must be set when ignore_older_than_attribute is used' if ignore_older_than_days.nil? && !ignore_older_than_attribute.nil?
+    raise 'ignore_older_than_attribute must be set when ignore_older_than_days is used' if ignore_older_than_attribute.nil? && !ignore_older_than_days.nil?
+
     # A little basic, but it works
     x500_domain = 'DC=' + ad_domain.split('.').join(',DC=')
 
@@ -41,30 +50,23 @@ class ActiveDirectoryInventory < TaskHelper
     raise "Error occured binding to the domain controller #{ldap_properties[:host]}: #{ldap.get_operation_result.message} #{ldap.get_operation_result.error_message}" unless ldap.get_operation_result.code.zero?
 
     # Execute the search
-    filter_older_attribute = opts[:filter_older_attribute]
-    filter_older_than_days = opts[:filter_older_than_days]
-    ignore_dns_hostnames = opts[:ignore_dns_hostnames]
-    member_of_group_dn = opts[:member_of_group_dn]
-    
     ldap_filter = Net::LDAP::Filter.eq('objectCategory', 'computer')
 
-    # filter out hosts that have a time property older than X days
-    if filter_older_attribute && filter_older_than_days
-      filter_older_attribute_s = filter_older_attribute.downcase.to_s
-      # compute the time (from now) older than X days
-      # this will be our "reference" time, anything older than this time is too old
-      # anything newer (greater) than this time we want to return
-      filter_older_than_unix = (DateTime.now - filter_older_than_days.to_i).to_time.to_i
+    # Ignore hosts that have a time property older than X days
+    if ignore_older_than_attribute && ignore_older_than_days
+      ignore_older_than_attribute_s = ignore_older_than_attribute.downcase.to_s
+      # Compute the time (from now) older than X days.
+      # This will be our "reference" time, anything older than this time is too old.
+      # Anything newer (greater) than this time we want to return.
+      filter_older_than_unix = (DateTime.now - ignore_older_than_days.to_i).to_time.to_i
       # convert the Unix timestamp to an LDAP timestamp
       filter_older_than_ldap = unix_to_ldap_time(filter_older_than_unix)
-    
-      ldap_filter = (ldap_filter & Net::LDAP::Filter.ge(filter_older_attribute, filter_older_than_ldap))
+
+      ldap_filter = (ldap_filter & Net::LDAP::Filter.ge(ignore_older_than_attribute, filter_older_than_ldap))
     end
 
-    # only return members of this group
-    if member_of_group_dn
-      ldap_filter = (ldap_filter & Net::LDAP::Filter.eq('memberOf', member_of_group_dn))
-    end
+    # Return members of this group
+    ldap_filter = (ldap_filter & Net::LDAP::Filter.eq('memberOf', member_of_group_dn)) if member_of_group_dn
 
     calc_transport = opts[:calculate_transport] || true
     result = []

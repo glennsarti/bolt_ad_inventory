@@ -27,6 +27,22 @@
     "calculate_transport": {
       "description" : "TODO Defaults to true",
       "type": "Optional[Boolean]"
+    },
+    "ignore_older_than_days": {
+      "description" : "Ignore computers that have a ignore_older_than_attribute time older than this many days.",
+      "type": "Optional[Integer[1]]"
+    },
+    "ignore_older_than_attribute": {
+      "description" : "LDAP attribute to use for ignoring old computers. Common attributes are pwdLastSet or lastLogonTimestamp",
+      "type": "Optional[String]"
+    },
+    "ignore_dns_hostnames": {
+      "description" : "Array of computer DNS Hostnames to ignore. These hosts will be excluded from the results",
+      "type": "Optional[Array[String]]"
+    },
+    "member_of_group_dn": {
+      "description" : "Only return computers that are members a group. This is full Distinguished Name (DN)",
+      "type": "Optional[String]"
     }
   }
 }

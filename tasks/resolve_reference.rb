@@ -10,6 +10,7 @@ task_helper = [
 raise "Could not find the Bolt ruby_task_helper" if task_helper.nil?
 require_relative task_helper
 
+require 'date'
 require 'net-ldap'
 
 class ActiveDirectoryInventory < TaskHelper
@@ -22,6 +23,15 @@ class ActiveDirectoryInventory < TaskHelper
     ad_domain = opts[:ad_domain]
     raise TaskHelper::Error.new('The Active Directory Inventory Plugin requires the ad_domain', 'bolt.plugin/validation-error') if ad_domain.nil? || ad_domain.empty?
     domain_controller = opts[:domain_controller] || opts[:ad_domain]
+
+    # Get user settings
+    ignore_older_than_attribute = opts[:ignore_older_than_attribute]
+    ignore_older_than_days = opts[:ignore_older_than_days]
+    ignore_dns_hostnames = opts[:ignore_dns_hostnames]
+    member_of_group_dn = opts[:member_of_group_dn]
+
+    raise 'ignore_older_than_days must be set when ignore_older_than_attribute is used' if ignore_older_than_days.nil? && !ignore_older_than_attribute.nil?
+    raise 'ignore_older_than_attribute must be set when ignore_older_than_days is used' if ignore_older_than_attribute.nil? && !ignore_older_than_days.nil?
 
     # A little basic, but it works
     x500_domain = 'DC=' + ad_domain.split('.').join(',DC=')
@@ -40,14 +50,33 @@ class ActiveDirectoryInventory < TaskHelper
     raise "Error occured binding to the domain controller #{ldap_properties[:host]}: #{ldap.get_operation_result.message} #{ldap.get_operation_result.error_message}" unless ldap.get_operation_result.code.zero?
 
     # Execute the search
+    ldap_filter = Net::LDAP::Filter.eq('objectCategory', 'computer')
+
+    # Ignore hosts that have a time property older than X days
+    if ignore_older_than_attribute && ignore_older_than_days
+      ignore_older_than_attribute_s = ignore_older_than_attribute.downcase.to_s
+      # Compute the time (from now) older than X days.
+      # This will be our "reference" time, anything older than this time is too old.
+      # Anything newer (greater) than this time we want to return.
+      filter_older_than_unix = (DateTime.now - ignore_older_than_days.to_i).to_time.to_i
+      # convert the Unix timestamp to an LDAP timestamp
+      filter_older_than_ldap = unix_to_ldap_time(filter_older_than_unix)
+
+      ldap_filter = (ldap_filter & Net::LDAP::Filter.ge(ignore_older_than_attribute, filter_older_than_ldap))
+    end
+
+    # Return members of this group
+    ldap_filter = (ldap_filter & Net::LDAP::Filter.eq('memberOf', member_of_group_dn)) if member_of_group_dn
+
     calc_transport = opts[:calculate_transport] || true
     result = []
     ldap.search(
-      base:         x500_domain,
-      filter:       Net::LDAP::Filter.eq( 'objectCategory', 'computer' ),
-      attributes:   DEFAULT_AD_ATTRIBUTES,
+      base:          x500_domain,
+      filter:        ldap_filter,
+      attributes:    DEFAULT_AD_ATTRIBUTES.dup,
       return_result: false
     ) do |entry|
+      next if ignore_dns_hostnames && ignore_ad_entry_by_dns_hostname?(entry, ignore_dns_hostnames)
       obj = ad_entry_to_target_hash(entry, calc_transport)
       result << obj unless obj.nil?
     end
@@ -56,6 +85,21 @@ class ActiveDirectoryInventory < TaskHelper
   end
 
   # private
+
+  def ignore_ad_entry_by_dns_hostname?(entry, ignore_dns_hostnames)
+    return false unless entry.attribute_names.include?(:dnshostname)
+    return false if entry.dnshostname.nil? || entry.dnshostname.empty?
+    entry_dns_hostname = entry.dnshostname[0]
+    ignore_dns_hostnames.include?(entry_dns_hostname)
+  end
+
+  def unix_to_ldap_time(unix_secs)
+    unix_datetime = Time.at(unix_secs).to_datetime
+    ldap_datetime = unix_datetime + ((1970 - 1601) * 365 + 89)
+    ldap_secs = ldap_datetime.to_time.to_i * 10**7
+    ldap_secs
+  end
+
   def ad_entry_to_target_hash(entry, calculate_transport)
     return unless entry.attribute_names.include?(:dnshostname)
     return if entry.dnshostname.nil? || entry.dnshostname.empty?
@@ -89,15 +133,5 @@ class ActiveDirectoryInventory < TaskHelper
 end
 
 if $PROGRAM_NAME == __FILE__
-  # TODO: DEBUG
-  if (__dir__.start_with?('C:/Source/'))
-    puts ActiveDirectoryInventory.new.task({
-      :ad_domain => 'bolt.local',
-      :domain_controller => '192.168.200.200',
-      :user => 'BOLT\\Administrator',
-      :password => 'Password1',
-    })
-    return
-  end
   ActiveDirectoryInventory.run
 end

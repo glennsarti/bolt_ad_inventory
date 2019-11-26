@@ -76,9 +76,7 @@ class ActiveDirectoryInventory < TaskHelper
       attributes:    DEFAULT_AD_ATTRIBUTES.dup,
       return_result: false
     ) do |entry|
-      if ignore_dns_hostnames
-        next if ad_entry_ignore_dns_hostnames(entry, ignore_dns_hostnames)
-      end
+      next if ignore_dns_hostnames && ignore_ad_entry_by_dns_hostname?(entry, ignore_dns_hostnames)
       obj = ad_entry_to_target_hash(entry, calc_transport)
       result << obj unless obj.nil?
     end
@@ -87,19 +85,12 @@ class ActiveDirectoryInventory < TaskHelper
   end
 
   # private
-  def ad_entry_ignore_dns_hostnames(entry, ignore_dns_hostnames)
+
+  def ignore_ad_entry_by_dns_hostname?(entry, ignore_dns_hostnames)
     return false unless entry.attribute_names.include?(:dnshostname)
     return false if entry.dnshostname.nil? || entry.dnshostname.empty?
     entry_dns_hostname = entry.dnshostname[0]
     ignore_dns_hostnames.include?(entry_dns_hostname)
-  end
-
-  def ldap_to_unix_time(ldap_time_s)
-    # https://stackoverflow.com/questions/4647169/how-to-convert-ldap-timestamp-to-unix-timestamp
-    seconds_since_epoch = ldap_time_s.to_f / 10**7
-    ldap_datetime = Time.at(seconds_since_epoch.to_i).to_datetime
-    unix_datetime = (ldap_datetime - ((1970 - 1601) * 365 + 89))
-    unix_datetime
   end
 
   def unix_to_ldap_time(unix_secs)

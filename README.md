@@ -25,6 +25,8 @@ This should be a fairly short description helps the user decide if your module i
 
 Install net-ldap gem into Bolt
 
+On Windows
+
 ``` text
 > "C:/Program Files/Puppet Labs/Bolt/bin/gem.bat" install --user-install net-ldap
 ```
@@ -36,7 +38,7 @@ Install net-ldap gem into Bolt
 
 ...
 
-> bundle exec bolt command run "Write-host 'Hello'" --modulepath spec/fixtures/modules  --inventoryfile example_inventory.yaml
+> bundle exec bolt command run "Write-Host 'Hello'" --modulepath spec/fixtures/modules --inventoryfile example_inventory.yaml
 ```
 
 Example Inventory

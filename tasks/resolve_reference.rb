@@ -133,15 +133,5 @@ class ActiveDirectoryInventory < TaskHelper
 end
 
 if $PROGRAM_NAME == __FILE__
-  # TODO: DEBUG
-  if (__dir__.start_with?('C:/Source/'))
-    puts ActiveDirectoryInventory.new.task({
-      :ad_domain => 'bolt.local',
-      :domain_controller => '192.168.200.200',
-      :user => 'BOLT\\Administrator',
-      :password => 'Password1',
-    })
-    return
-  end
   ActiveDirectoryInventory.run
 end
